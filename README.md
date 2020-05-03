@@ -37,15 +37,15 @@ To save and retrieve structs using Persist, each struct must
 * implement initialize to retrieve all related Saveable objects,
 * implement saveRelated to save all related Saveable objects.
 
-See BudgetModel.swift for examples.
+See BudgetModel.swift for more examples.
 
 ## History
 
 This is a port of a persistence layer I wrote for a RubyMotion budgeting application.
 
-In the Ruby version, much more of the persistence logic was implemented using reflection.  I tried to achieve the same thing in Swift, but found there were limits to Swift's reflection capabilities relative to Ruby.  The solution I ended up with was the Saveable protocol described above, which requires custom methods for retrieving and saving related objects.
+In the Ruby version, more of the persistence logic was implemented using reflection.  I tried to achieve the same thing in Swift, but found there were limits to Swift's reflection capabilities relative to Ruby.  The solution I ended up with was the Saveable protocol described above, which requires explicit methods for retrieving and saving related objects.
 
-I am curious if there is a better way to model these persistence relationships more declaratively, and eliminate the intialize and saveRelated methods.
+I am curious if there is a better way to model these persistence relationships more declaratively in Swift, and eliminate the intialize and saveRelated methods.
 
 ## Database Design
 
@@ -53,19 +53,23 @@ The SQLite database contains two tables, modeling a graph of the persisted objec
 
 ### by_type
 
-The vertexes of the graph.  Allows selecting objects by their type.  Columns:
+The vertexes of the graph.  Allows selecting objects by their type.
 
-* id: uniquely identifies the object.
-* type_name: the struct type.
-* json: codable properties coded as JSON
+|Column|Description|
+|---------|-------------|
+|id|uniquely identifies the object|
+|type_name|the struct type|
+|json|codable properties coded as JSON|
 
 ### relations
 
-The directed edges of the graph.  Models references from one object to another.  Columns:
+The directed edges of the graph.  Models references from one object to another.
 
-* from_id: identifies the referencing object
-* to_id: identifies the referenced object
-* relation: name of the property
+|Column|Description|
+|---------|-------------|
+|from_id|identifies the referencing object|
+|to_id|identifies the referenced object|
+|relation|name of the property|
 
 ## Limitations
 
