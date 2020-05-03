@@ -18,17 +18,7 @@ final class PersistTests: XCTestCase {
         try sqlitePersister.createTables()
         return sqlitePersister
     }
-    
-    func testBudgetDb() throws {
-        let dbPath = "/Users/jimbo/projects/ruby-motion/family_budget/family_budget_export.sqlite"
-        let saveState = SQLitePersister(path: dbPath)!
-        let budgets = try saveState.retrieve(type: Budget.self, start: 1, limit: 10)
-        XCTAssertEqual(budgets.count, 10)
-        for budget in budgets {
-            print("retrieved budget: \(budget)")
-        }
-    }
-    
+
     func testSaveBudgetItems() throws {
         var item1 = BudgetItem(label: "budget item test", budgeted: 1.5)
         var item2 = BudgetItem(label: "budget item test2", budgeted: 2.1)
