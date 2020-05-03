@@ -20,9 +20,14 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
             name: "Persist",
-            dependencies: []),
+            dependencies: [
+                .product(name: "SQLite", package: "SQLite.swift")]),
         .testTarget(
             name: "PersistTests",
             dependencies: ["Persist"]),
     ]
 )
+
+package.dependencies = [
+    .package(name: "SQLite.swift", url: "https://github.com/stephencelis/SQLite.swift", from: "0.12.2")
+]
