@@ -33,7 +33,7 @@ extension Saveable {
         return saveState?.relatedItem(object: self, property: property, toType: toType)
     }
     
-    fileprivate func childWithLabel(_ property: String) -> Mirror.Child? {
+    private func childWithLabel(_ property: String) -> Mirror.Child? {
         return Mirror(reflecting: self).children
             .filter({ $0.label == property })
             .first

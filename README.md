@@ -37,15 +37,15 @@ To save and retrieve structs using Persist, each struct must
 * implement initialize to retrieve all related Saveable objects,
 * implement saveRelated to save all related Saveable objects.
 
-See BudgetModel.swift for more examples.
+See BudgetModel.swift for examples.
 
 ## History
 
 This is a port of a persistence layer I wrote for a RubyMotion budgeting application.
 
-In the Ruby version, more of the persistence logic was implemented using reflection.  I tried to achieve the same thing in Swift, but found there were limits to Swift's reflection capabilities relative to Ruby.  The solution I ended up with was the Saveable protocol described above, which requires explicit methods for retrieving and saving related objects.
+In the Ruby version, more of the persistence logic was implemented using reflection.  I tried to achieve the same thing in Swift, but  there are limits to Swift's reflection capabilities relative to Ruby.  For example, the Mirror API allows for reflecting over properties and reading their values, but not writing them.
 
-I am curious if there is a way to eliminate the intialize and saveRelated methods entirely, but I haven't yet discovered one.
+The solution I ended up with was the Saveable protocol described above, which requires explicit methods for retrieving and saving related objects.
 
 ## Database Design
 
@@ -73,7 +73,7 @@ The directed edges of the graph.  Models references from one object to another.
 
 ## Limitations
 
-An advantage of this model is that it doesn't require explicitly modeling the data schema in SQLite.  A corresponding disadvantage is that querying, sorting, and filtering cannot be pushed to the SQLite database.  So all of that functionality must be implemented in memory at the application level.
+An advantage of this design is that it doesn't require explicitly modeling the data schema in SQLite.  A corresponding disadvantage is that querying, sorting, and filtering cannot be pushed to the SQLite database.  So all of that functionality must be implemented in memory at the application level.
 
 In practice, this means Persist is best suited to applications where the entire application state can be loaded into memory.
 
