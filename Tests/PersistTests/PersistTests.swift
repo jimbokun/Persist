@@ -135,7 +135,7 @@ final class PersistTests: XCTestCase {
         var split2 = Transaction(amount: 40, memo: "socks", checkno: 2, date: txDate)
         let actual = ActualItem(amount: 40, memo: "socks", checkno: "2", date: txDate)
         
-        split2.actual = actual
+        split2.actual_item = actual
         parent.splits = [split1, split2]
         
         try persister.saveAll(object: &parent)
@@ -145,12 +145,12 @@ final class PersistTests: XCTestCase {
         XCTAssertEqual(txs.count, 3)
         XCTAssertTrue(txs.contains(where: { tx in
             tx.splits.count == 2 && tx.splits.contains(where: { split in
-                split.actual != nil
+                split.actual_item != nil
             })
         }))
     }
 
     static var allTests = [
-        ("testPersist", testBudgetDb),
+        ("testPersist", testSaveBudgetItems)
     ]
 }

@@ -25,20 +25,35 @@ protocol Saveable : Codable {
 }
 
 extension Saveable {
-    func appendRelated<To>(items: inout [To], property: String, toType: To.Type) where To: Saveable {
-        saveState?.appendRelated(object: self, items: &items, property: property, toType: toType)
+    func related<To>(property: String, toType: To.Type) -> [To] where To: Saveable {
+        (try? saveState?.related(object: self, property: property, toType: toType)) ?? []
     }
-    
+
     func relatedItem<To>(property: String, toType: To.Type) -> To? where To: Saveable {
         return saveState?.relatedItem(object: self, property: property, toType: toType)
     }
     
-    func saveRelations<To>(items: inout [To], property: String, toType: To.Type, recurse: Bool) throws where To: Saveable {
-        try saveState?.saveRelations(object: self, items: &items, property: property, toType: toType, recurse: recurse)
+    fileprivate func childWithLabel(_ property: String) -> Mirror.Child? {
+        return Mirror(reflecting: self).children
+            .filter({ $0.label == property })
+            .first
+    }
+
+    func saveRelations<To>(property: String, toType: To.Type, recurse: Bool) throws where To: Saveable {
+        if let child = childWithLabel(property) {
+            if var items = child.value as? [To] {
+                try saveState?.saveRelations(object: self, items: &items, property: property, toType: toType, recurse: recurse)
+            }
+        }
     }
     
-    func saveRelation<To>(item: inout To?, property: String, toType: To.Type, recurse: Bool) throws where To: Saveable {
-        try saveState?.saveRelation(object: self, item: &item, property: property, toType: toType, recurse: recurse)
+    func saveRelation<To>(property: String, toType: To.Type, recurse: Bool) throws where To: Saveable {
+        if let child = childWithLabel(property) {
+            if let item = child.value as? To {
+                var items = [item]
+                try saveState?.saveRelations(object: self, items: &items, property: property, toType: toType, recurse: recurse)
+            }
+        }
     }
 }
 
@@ -87,11 +102,6 @@ protocol Persister {
      Persist relationships between object and items via property.  If recurse is true, recursively save each item in items and all of its related objects.
      */
     func saveRelations<From, To>(object: From, items: inout [To], property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable
-
-    /**
-     Persist relationship between object and item via property.  If recurse is true, recursively save item and all of its related objects.
-     */
-    func saveRelation<From, To>(object: From, item: inout To?, property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable
 
     /**
      Delete object and its relationships to other objects.
@@ -236,13 +246,6 @@ struct SQLitePersister : Persister {
                                                 relation <- property))
                 }
             }
-        }
-    }
-    
-    func saveRelation<From, To>(object: From, item: inout To?, property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable {
-        if let x = item {
-            var items = [x]
-            try saveRelations(object: object, items: &items, property: property, toType: toType, recurse: recurse)
         }
     }
 

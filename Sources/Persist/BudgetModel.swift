@@ -17,11 +17,11 @@ struct Budget: Saveable {
     var items: [BudgetItem] = []
     
     mutating func initialize() {
-        appendRelated(items: &items, property: "items", toType: BudgetItem.self)
+        items = related(property: "items", toType: BudgetItem.self)
     }
 
     mutating func saveRelated(recurse: Bool) throws {
-        try saveRelations(items: &items, property: "items", toType: BudgetItem.self, recurse: recurse)
+        try saveRelations(property: "items", toType: BudgetItem.self, recurse: recurse)
     }
 
     enum CodingKeys: CodingKey {
@@ -37,14 +37,14 @@ struct BudgetItem : Saveable {
 
     var label: String
     var budgeted: Float
-    var items: [ActualItem] = []
+    var actual_items: [ActualItem] = []
     
     mutating func initialize() {
-        appendRelated(items: &items, property: "actual_items", toType: ActualItem.self)
+        actual_items = related(property: "actual_items", toType: ActualItem.self)
     }
 
     mutating func saveRelated(recurse: Bool) throws {
-        try saveRelations(items: &items, property: "actual_items", toType: ActualItem.self, recurse: recurse)
+        try saveRelations(property: "actual_items", toType: ActualItem.self, recurse: recurse)
     }
 
     enum CodingKeys: CodingKey {
@@ -84,17 +84,17 @@ struct Transaction : Saveable {
     var memo: String
     var checkno: Int
     var date: Date
-    var actual: ActualItem?
+    var actual_item: ActualItem?
     var splits: [Transaction] = []
 
     mutating func initialize() {
-        actual = relatedItem(property: "actual_item", toType: ActualItem.self)
-        appendRelated(items: &splits, property: "splits", toType: Transaction.self)
+        actual_item = relatedItem(property: "actual_item", toType: ActualItem.self)
+        splits = related(property: "splits", toType: Transaction.self)
     }
     
     mutating func saveRelated(recurse: Bool) throws {
-        try saveRelation(item: &actual, property: "actual_item", toType: ActualItem.self, recurse: recurse)
-        try saveRelations(items: &splits, property: "splits", toType: Transaction.self, recurse: recurse)
+        try saveRelation(property: "actual_item", toType: ActualItem.self, recurse: recurse)
+        try saveRelations(property: "splits", toType: Transaction.self, recurse: recurse)
     }
 
     enum CodingKeys: CodingKey {

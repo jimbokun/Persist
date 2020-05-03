@@ -45,7 +45,7 @@ This is a port of a persistence layer I wrote for a RubyMotion budgeting applica
 
 In the Ruby version, more of the persistence logic was implemented using reflection.  I tried to achieve the same thing in Swift, but found there were limits to Swift's reflection capabilities relative to Ruby.  The solution I ended up with was the Saveable protocol described above, which requires explicit methods for retrieving and saving related objects.
 
-I am curious if there is a better way to model these persistence relationships more declaratively in Swift, and eliminate the intialize and saveRelated methods.
+I am curious if there is a way to eliminate the intialize and saveRelated methods entirely, but I haven't yet discovered one.
 
 ## Database Design
 
