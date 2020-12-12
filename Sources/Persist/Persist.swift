@@ -6,7 +6,7 @@ import Foundation
  All "scalar" (non-Saveable) values will be automatically encoded and decoded through the Codable protocol.
  Other related objects must implement Saveable.
  */
-protocol Saveable : Codable {
+public protocol Saveable : Codable {
     var saveState: Persister? { get set }
     /**
      Uniquely identifies this object.
@@ -60,7 +60,7 @@ extension Saveable {
 /**
  Defines methods for persisting and retrieving objects.
  */
-protocol Persister {
+public protocol Persister {
     /**
      Retrieve all objects of type T.
      */
@@ -77,7 +77,7 @@ protocol Persister {
     func related<From, To>(object: From, property: String, toType: To.Type) throws -> [To] where From: Saveable, To: Saveable
     
     /**
-     Retrieve objects related to object of type To, via property.
+     Retrieve object related to object of type To, via property.
      */
     func relatedItem<From, To>(object: From, property: String, toType: To.Type) -> To? where From: Saveable, To: Saveable
 
@@ -112,7 +112,7 @@ protocol Persister {
 /**
  Implementation of Persister backed by a SQLite database.
  */
-struct SQLitePersister : Persister {
+public struct SQLitePersister : Persister {
     let db: Connection
     
     let byType: Table
@@ -170,19 +170,19 @@ struct SQLitePersister : Persister {
         return try db.prepare(query).map { row in try decodeRow(type, from: row) }
     }
     
-    func retrieve<T>(type: T.Type, start: Int, limit: Int) throws -> [T] where T: Saveable {
+    public func retrieve<T>(type: T.Type, start: Int, limit: Int) throws -> [T] where T: Saveable {
         let query = byType.select(id, json)
             .filter(typeName == String(describing: type))
             .limit(limit, offset: start)
         return try retrieve(query: query, type: type)
     }
 
-    func retrieve<T>(type: T.Type) throws -> [T] where T: Saveable {
+    public func retrieve<T>(type: T.Type) throws -> [T] where T: Saveable {
         let query = byType.select(id, json).filter(typeName == String(describing: type))
         return try retrieve(query: query, type: type)
     }
     
-    func related<From, To>(object: From, property: String, toType: To.Type) throws -> [To] where From: Saveable, To: Saveable {
+    public func related<From, To>(object: From, property: String, toType: To.Type) throws -> [To] where From: Saveable, To: Saveable {
         let query = relations
             .select(id, json)
             .join(byType, on: to == id)
@@ -190,7 +190,7 @@ struct SQLitePersister : Persister {
         return try retrieve(query: query, type: toType)
     }
     
-    func relatedItem<From, To>(object: From, property: String, toType: To.Type) -> To? where From: Saveable, To: Saveable {
+    public func relatedItem<From, To>(object: From, property: String, toType: To.Type) -> To? where From: Saveable, To: Saveable {
         if let items = try? related(object: object, property: property, toType: toType) {
             if items.count == 1 {
                 return items[0]
@@ -199,7 +199,7 @@ struct SQLitePersister : Persister {
         return nil
     }
 
-    func appendRelated<From, To>(object: From, items: inout [To], property: String, toType: To.Type) where From: Saveable, To: Saveable {
+    public func appendRelated<From, To>(object: From, items: inout [To], property: String, toType: To.Type) where From: Saveable, To: Saveable {
         if let relatedItems = try? related(object: object, property: property, toType: toType) {
             items.append(contentsOf: relatedItems)
         }
@@ -221,17 +221,17 @@ struct SQLitePersister : Persister {
         object.saveState = self
     }
 
-    func save<T>(object: inout T) throws where T: Saveable {
+    public func save<T>(object: inout T) throws where T: Saveable {
         try saveProperties(object: &object)
         try object.saveRelated(recurse: false)
     }
     
-    func saveAll<T>(object: inout T) throws where T: Saveable {
+    public func saveAll<T>(object: inout T) throws where T: Saveable {
         try saveProperties(object: &object)
         try object.saveRelated(recurse: true)
     }
 
-    func saveRelations<From, To>(object: From, items: inout [To], property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable {
+    public func saveRelations<From, To>(object: From, items: inout [To], property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable {
         if let identifier = object.identifier {
             try db.run(relations
                 .filter(from == identifier && relation == property)
@@ -249,7 +249,7 @@ struct SQLitePersister : Persister {
         }
     }
 
-    func delete<T>(object: T) throws where T: Saveable {
+    public func delete<T>(object: T) throws where T: Saveable {
         if let identifier = object.identifier {
             try db.run(byType.filter(id == identifier).delete())
             try db.run(relations.filter(from == identifier).delete())

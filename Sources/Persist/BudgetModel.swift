@@ -8,19 +8,19 @@
 
 import Foundation
 
-struct Budget: Saveable {
-    var saveState: Persister?
-    var identifier: Int?
+public struct Budget: Saveable {
+    public var saveState: Persister?
+    public var identifier: Int?
     
     var date: Date
     var amount: Float
     var items: [BudgetItem] = []
     
-    mutating func initialize() {
+    mutating public func initialize() {
         items = related(property: "items", toType: BudgetItem.self)
     }
 
-    mutating func saveRelated(recurse: Bool) throws {
+    mutating public func saveRelated(recurse: Bool) throws {
         try saveRelations(property: "items", toType: BudgetItem.self, recurse: recurse)
     }
 
@@ -31,19 +31,19 @@ struct Budget: Saveable {
 }
 
 
-struct BudgetItem : Saveable {
-    var saveState: Persister?
-    var identifier: Int?
+public struct BudgetItem : Saveable {
+    public var saveState: Persister?
+    public var identifier: Int?
 
     var label: String
     var budgeted: Float
     var actual_items: [ActualItem] = []
     
-    mutating func initialize() {
+    mutating public func initialize() {
         actual_items = related(property: "actual_items", toType: ActualItem.self)
     }
 
-    mutating func saveRelated(recurse: Bool) throws {
+    mutating public func saveRelated(recurse: Bool) throws {
         try saveRelations(property: "actual_items", toType: ActualItem.self, recurse: recurse)
     }
 
@@ -76,9 +76,9 @@ struct ActualItem : Saveable {
     }
 }
 
-struct Transaction : Saveable {
-    var saveState: Persister?
-    var identifier: Int?
+public struct Transaction : Saveable {
+    public var saveState: Persister?
+    public var identifier: Int?
 
     var amount: Float
     var memo: String
@@ -87,12 +87,12 @@ struct Transaction : Saveable {
     var actual_item: ActualItem?
     var splits: [Transaction] = []
 
-    mutating func initialize() {
+    mutating public func initialize() {
         actual_item = relatedItem(property: "actual_item", toType: ActualItem.self)
         splits = related(property: "splits", toType: Transaction.self)
     }
     
-    mutating func saveRelated(recurse: Bool) throws {
+    mutating public func saveRelated(recurse: Bool) throws {
         try saveRelation(property: "actual_item", toType: ActualItem.self, recurse: recurse)
         try saveRelations(property: "splits", toType: Transaction.self, recurse: recurse)
     }
