@@ -127,7 +127,7 @@ public struct SQLitePersister : Persister {
     let decoder: JSONDecoder
     let encoder: JSONEncoder
     
-    init(db: Connection) {
+    public init(db: Connection) {
         self.byType = Table("by_type")
         self.typeName = Expression<String>("type_name")
         self.json = Expression<String>("json")
@@ -151,7 +151,7 @@ public struct SQLitePersister : Persister {
         self.db = db
     }
 
-    init?(path dbPath: String) {
+    public init?(path dbPath: String) {
         guard let db = try? Connection(dbPath) else {
             return nil
         }
