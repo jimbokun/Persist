@@ -12,9 +12,9 @@ public struct Budget: Saveable {
     public var saveState: Persister?
     public var identifier: Int?
     
-    var date: Date
-    var amount: Float
-    var items: [BudgetItem] = []
+    public var date: Date
+    public var amount: Float
+    public var items: [BudgetItem] = []
     
     mutating public func initialize() {
         items = related(property: "items", toType: BudgetItem.self)
@@ -35,9 +35,9 @@ public struct BudgetItem : Saveable {
     public var saveState: Persister?
     public var identifier: Int?
 
-    var label: String
-    var budgeted: Float
-    var actual_items: [ActualItem] = []
+    public var label: String
+    public var budgeted: Float
+    public var actual_items: [ActualItem] = []
     
     mutating public func initialize() {
         actual_items = related(property: "actual_items", toType: ActualItem.self)
@@ -53,19 +53,19 @@ public struct BudgetItem : Saveable {
     }
 }
 
-struct ActualItem : Saveable {
-    var saveState: Persister?
-    var identifier: Int?
+public struct ActualItem : Saveable {
+    public var saveState: Persister?
+    public var identifier: Int?
 
-    var amount: Float
-    var memo: String
-    var checkno: String?
-    var date: Date
+    public var amount: Float
+    public var memo: String
+    public var checkno: String?
+    public var date: Date
 
-    func initialize() {
+    public func initialize() {
     }
     
-    func saveRelated(recurse: Bool) {
+    public func saveRelated(recurse: Bool) {
     }
 
     enum CodingKeys: CodingKey {
@@ -80,12 +80,12 @@ public struct Transaction : Saveable {
     public var saveState: Persister?
     public var identifier: Int?
 
-    var amount: Float
-    var memo: String
-    var checkno: Int
-    var date: Date
-    var actual_item: ActualItem?
-    var splits: [Transaction] = []
+    public var amount: Float
+    public var memo: String
+    public var checkno: Int
+    public var date: Date
+    public var actual_item: ActualItem?
+    public var splits: [Transaction] = []
 
     mutating public func initialize() {
         actual_item = relatedItem(property: "actual_item", toType: ActualItem.self)
