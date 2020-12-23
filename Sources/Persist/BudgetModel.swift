@@ -8,7 +8,15 @@
 
 import Foundation
 
-public struct Budget: Saveable {
+public struct Budget: Saveable {    
+    public init(saveState: Persister? = nil, identifier: Int? = nil, date: Date, amount: Float, items: [BudgetItem] = []) {
+        self.saveState = saveState
+        self.identifier = identifier
+        self.date = date
+        self.amount = amount
+        self.items = items
+    }
+    
     public var saveState: Persister?
     public var identifier: Int?
     
@@ -32,6 +40,14 @@ public struct Budget: Saveable {
 
 
 public struct BudgetItem : Saveable {
+    public init(saveState: Persister? = nil, identifier: Int? = nil, label: String, budgeted: Float, actual_items: [ActualItem] = []) {
+        self.saveState = saveState
+        self.identifier = identifier
+        self.label = label
+        self.budgeted = budgeted
+        self.actual_items = actual_items
+    }
+    
     public var saveState: Persister?
     public var identifier: Int?
 
@@ -54,6 +70,15 @@ public struct BudgetItem : Saveable {
 }
 
 public struct ActualItem : Saveable {
+    public init(saveState: Persister? = nil, identifier: Int? = nil, amount: Float, memo: String, checkno: String? = nil, date: Date) {
+        self.saveState = saveState
+        self.identifier = identifier
+        self.amount = amount
+        self.memo = memo
+        self.checkno = checkno
+        self.date = date
+    }
+    
     public var saveState: Persister?
     public var identifier: Int?
 
@@ -77,6 +102,17 @@ public struct ActualItem : Saveable {
 }
 
 public struct Transaction : Saveable {
+    public init(saveState: Persister? = nil, identifier: Int? = nil, amount: Float, memo: String, checkno: Int, date: Date, actual_item: ActualItem? = nil, splits: [Transaction] = []) {
+        self.saveState = saveState
+        self.identifier = identifier
+        self.amount = amount
+        self.memo = memo
+        self.checkno = checkno
+        self.date = date
+        self.actual_item = actual_item
+        self.splits = splits
+    }
+    
     public var saveState: Persister?
     public var identifier: Int?
 
