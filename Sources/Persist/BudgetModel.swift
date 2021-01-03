@@ -117,7 +117,8 @@ public struct Transaction : Saveable {
     public var identifier: Int?
 
     public var amount: Float
-    public var memo: String
+    public var memo: String?
+    public var name: String?
     public var checkno: Int?
     public var timestamp: Date
     public var actual_item: ActualItem?
