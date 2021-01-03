@@ -108,7 +108,7 @@ public struct Transaction : Saveable {
         self.amount = amount
         self.memo = memo
         self.checkno = checkno
-        self.date = date
+        self.timestamp = date
         self.actual_item = actual_item
         self.splits = splits
     }
@@ -119,7 +119,7 @@ public struct Transaction : Saveable {
     public var amount: Float
     public var memo: String
     public var checkno: Int?
-    public var date: Date
+    public var timestamp: Date
     public var actual_item: ActualItem?
     public var splits: [Transaction] = []
 
@@ -137,6 +137,6 @@ public struct Transaction : Saveable {
         case amount
         case memo
         case checkno
-        case date
+        case timestamp
     }
 }
