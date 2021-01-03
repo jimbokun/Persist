@@ -118,7 +118,7 @@ public struct Transaction : Saveable {
 
     public var amount: Float
     public var memo: String
-    public var checkno: Int
+    public var checkno: Int?
     public var date: Date
     public var actual_item: ActualItem?
     public var splits: [Transaction] = []
