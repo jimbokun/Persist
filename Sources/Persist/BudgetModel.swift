@@ -102,13 +102,13 @@ public struct ActualItem : Saveable {
 }
 
 public struct Transaction : Saveable {
-    public init(saveState: Persister? = nil, identifier: Int? = nil, amount: Float, memo: String, checkno: Int, date: Date, actual_item: ActualItem? = nil, splits: [Transaction] = []) {
+    public init(saveState: Persister? = nil, identifier: Int? = nil, amount: Float, memo: String, checkno: String? = nil, timestamp: Date, actual_item: ActualItem? = nil, splits: [Transaction] = []) {
         self.saveState = saveState
         self.identifier = identifier
         self.amount = amount
         self.memo = memo
         self.checkno = checkno
-        self.timestamp = date
+        self.timestamp = timestamp
         self.actual_item = actual_item
         self.splits = splits
     }
@@ -119,7 +119,7 @@ public struct Transaction : Saveable {
     public var amount: Float
     public var memo: String?
     public var name: String?
-    public var checkno: Int?
+    public var checkno: String?
     public var timestamp: Date
     public var actual_item: ActualItem?
     public var splits: [Transaction] = []
@@ -137,6 +137,7 @@ public struct Transaction : Saveable {
     enum CodingKeys: CodingKey {
         case amount
         case memo
+        case name
         case checkno
         case timestamp
     }

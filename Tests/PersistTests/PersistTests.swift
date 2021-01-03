@@ -130,9 +130,9 @@ final class PersistTests: XCTestCase {
     
     func testToOne() throws {
         let txDate: Date = formatter.date(from: "2020-04-14 01:40:59 +0000")!
-        var parent = Transaction(amount: 100, memo: "socks", checkno: 2, date: txDate)
-        let split1 = Transaction(amount: 60, memo: "socks", checkno: 2, date: txDate)
-        var split2 = Transaction(amount: 40, memo: "socks", checkno: 2, date: txDate)
+        var parent = Transaction(amount: 100, memo: "socks", checkno: "2", timestamp: txDate)
+        let split1 = Transaction(amount: 60, memo: "socks", checkno: "2", timestamp: txDate)
+        var split2 = Transaction(amount: 40, memo: "socks", checkno: "2", timestamp: txDate)
         let actual = ActualItem(amount: 40, memo: "socks", checkno: "2", date: txDate)
         
         split2.actual_item = actual
