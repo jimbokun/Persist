@@ -126,6 +126,26 @@ final class PersistTests: XCTestCase {
         retrievedItems = try persister.retrieve(type: BudgetItem.self)
 
         XCTAssertEqual(retrievedItems.count, 1)
+        
+        let undoOp = persister.undo()
+        
+        XCTAssert(undoOp != nil)
+        if let op = undoOp {
+            XCTAssertEqual(op.opType, .create)
+        }
+
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        XCTAssertEqual(retrievedItems.count, 2)
+        
+        let redoOp = persister.redo()
+        
+        XCTAssert(redoOp != nil)
+        if let op = redoOp {
+            XCTAssertEqual(op.opType, .delete)
+        }
+
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        XCTAssertEqual(retrievedItems.count, 1)
     }
     
     func testToOne() throws {
@@ -148,6 +168,48 @@ final class PersistTests: XCTestCase {
                 split.actual_item != nil
             })
         }))
+    }
+    
+    func testUndo() throws {
+        var item1 = BudgetItem(label: "budget item test", budgeted: 1.5)
+        
+        try persister.save(object: &item1)
+
+        var retrievedItems = try persister.retrieve(type: BudgetItem.self)
+
+        XCTAssertEqual(retrievedItems.count, 1)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.5}))
+        
+        item1 = retrievedItems[0]
+        item1.budgeted = 1.6
+        try persister.save(object: &item1)
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        
+        XCTAssertEqual(retrievedItems.count, 1)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.6}))
+        
+        let undoOp = persister.undo()
+        XCTAssertTrue(undoOp != nil)
+        if let op = undoOp {
+            XCTAssertEqual(op.opType, .update)
+        }
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        XCTAssertEqual(retrievedItems.count, 1)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.5}))
+        
+        let redoOp = persister.redo()
+        XCTAssertTrue(redoOp != nil)
+        if let op = redoOp {
+            XCTAssertEqual(op.opType, .update)
+        }
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        XCTAssertEqual(retrievedItems.count, 1)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.6}))
+
     }
 
     static var allTests = [
