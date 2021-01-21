@@ -149,7 +149,6 @@ public protocol Persister {
  Implementation of Persister backed by a SQLite database.
  */
 public struct SQLitePersister : Persister {
-    
     let db: Connection
     
     let byType: Table
@@ -172,7 +171,8 @@ public struct SQLitePersister : Persister {
     let beforeJson: Expression<String>
     let afterJson: Expression<String>
     
-    let relationsHistory: Table
+    let relationsHistoryBefore: Table
+    let relationsHistoryAfter: Table
     
     let decoder: JSONDecoder
     let encoder: JSONEncoder
@@ -199,7 +199,8 @@ public struct SQLitePersister : Persister {
         self.beforeJson = Expression<String>("before_json")
         self.afterJson = Expression<String>("after_json")
         
-        self.relationsHistory = Table("relations_history")
+        self.relationsHistoryBefore = Table("relations_history_before")
+        self.relationsHistoryAfter = Table("relations_history_after")
         
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZZ"
@@ -306,23 +307,31 @@ public struct SQLitePersister : Persister {
         }
         object.saveState = self
     }
-    
-    public func save<T>(object: inout T) throws where T: Saveable {
+
+    fileprivate func save<T>(object: inout T, recurse: Bool) throws where T: Saveable {
         try saveProperties(object: &object)
-        try object.saveRelated(recurse: false)
+        try insertRelationsHistory(object, relationsHistoryBefore)
+        try object.saveRelated(recurse: recurse)
+        try insertRelationsHistory(object, relationsHistoryAfter)
+    }
+
+    public func save<T>(object: inout T) throws where T: Saveable {
+        try save(object: &object, recurse: false)
     }
     
     public func saveAll<T>(object: inout T) throws where T: Saveable {
-        try saveProperties(object: &object)
+        try save(object: &object, recurse: true)
+    }
+    
+    fileprivate func insertRelationsHistory<T>(_ object: T, _ relationsHistory: Table) throws where T: Saveable {
         let opId = try db.scalar(operations.select(id).filter(isCurrent))
         if let identifier = object.identifier {
             for row in try db.prepare(relations.filter(from == identifier || to == identifier)) {
                 try db.run(relationsHistory.insert(operationId <- opId, from <- row[from], to <- row[to], relation <- row[relation]))
             }
         }
-        try object.saveRelated(recurse: true)
     }
-    
+
     public func saveRelations<From, To>(object: From, items: inout [To], property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable {
         if let identifier = object.identifier {
             try db.run(relations
@@ -358,28 +367,23 @@ public struct SQLitePersister : Persister {
         }
     }
     
-    fileprivate func performOperation(_ opType: OperationType, _ row: Row, _ updateJson: String) throws -> Operation {
-        let relationsQuery = operations
-            .select(operationId, operationType, byTypeId, typeName, beforeJson, afterJson)
-            .filter(isCurrent)
-            .join(relationsHistory, on: operations[id] == relationsHistory[operationId])
+    fileprivate func performOperation(_ opType: OperationType, _ row: Row, _ updateJson: String, _ relationsHistory: Table) throws -> Operation {
+        let relationsQuery = relationsHistory
+            .select(from, to, relation)
+            .filter(row[operationId] == relationsHistory[operationId])
         switch opType {
         case .create:
             try db.run(byType.insert(id <- row[byTypeId], json <- updateJson, typeName <- row[typeName]))
             for row in try db.prepare(relationsQuery) {
-                try db.run(relations.insert(from <- row[from], to <- row[to]))
+                try db.run(relations.insert(from <- row[from], to <- row[to], relation <- row[relation]))
             }
         case .update:
-            try db.run(byType.filter(id == row[byTypeId])
-                        .update(json <- updateJson))
+            try db.run(byType.filter(id == row[byTypeId]).update(json <- updateJson))
             try db.run(relations
-                        .filter(from == row[byTypeId])
-                        .delete())
-            try db.run(relations
-                        .filter(to == row[byTypeId])
+                        .filter(from == row[byTypeId] || to == row[byTypeId])
                         .delete())
             for row in try db.prepare(relationsQuery) {
-                try db.run(relations.insert(from <- row[from], to <- row[to]))
+                try db.run(relations.insert(from <- row[from], to <- row[to], relation <- row[relation]))
             }
         case .delete:
             try db.run(byType.filter(id == row[byTypeId]).delete())
@@ -407,14 +411,16 @@ public struct SQLitePersister : Persister {
             .join(byTypeHistory, on: operations[id] == byTypeHistory[operationId])
         do {
             for row in try db.prepare(byTypeQuery) {
+                let opType: OperationType
                 switch row[operationType] {
                 case .create:
-                    operation = try performOperation(.delete, row, row[beforeJson])
+                    opType = .delete
                 case .delete:
-                    operation = try performOperation(.create, row, row[beforeJson])
+                    opType = .create
                 default:
-                    operation = try performOperation(.update, row, row[beforeJson])
+                    opType = .update
                 }
+                operation = try performOperation(opType, row, row[beforeJson], relationsHistoryBefore)
                 try toggleIsCurrent(isCurrentFilter: nextOperation == row[operationId])
             }
         } catch {
@@ -435,7 +441,7 @@ public struct SQLitePersister : Persister {
                     .filter(operationId == nextOpRow[nextOperation])
                     .join(operations, on: operations[id] == byTypeHistory[operationId])
                 for row in try db.prepare(byTypeQuery) {
-                    operation = try performOperation(row[operationType], row, row[afterJson])
+                    operation = try performOperation(row[operationType], row, row[afterJson], relationsHistoryAfter)
                     try toggleIsCurrent(isCurrentFilter: id == row[operationId])
                 }
             }
@@ -470,7 +476,14 @@ public struct SQLitePersister : Persister {
             t.column(beforeJson)
             t.column(afterJson)
         })
-        try db.run(relationsHistory.create(ifNotExists: true) { t in
+        try db.run(relationsHistoryBefore.create(ifNotExists: true) { t in
+            t.column(id, primaryKey: true)
+            t.column(operationId)
+            t.column(from)
+            t.column(to)
+            t.column(relation)
+        })
+        try db.run(relationsHistoryAfter.create(ifNotExists: true) { t in
             t.column(id, primaryKey: true)
             t.column(operationId)
             t.column(from)

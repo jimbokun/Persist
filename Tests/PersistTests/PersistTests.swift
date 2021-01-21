@@ -68,6 +68,7 @@ final class PersistTests: XCTestCase {
         
         try persister.save(object: &item1)
         try persister.save(object: &item2)
+        try persister.save(object: &budget)
         budget.items = [item1, item2]
         try persister.save(object: &budget)
         
@@ -79,7 +80,29 @@ final class PersistTests: XCTestCase {
         XCTAssertTrue(retrievedItems.contains(where: { item in
             item.label == "budget item test2" && item.budgeted == 2.1}))
 
-        let budgets: [Budget] = try persister.retrieve(type: Budget.self)
+        var budgets: [Budget] = try persister.retrieve(type: Budget.self)
+        
+        XCTAssertEqual(budgets.count, 1)
+        XCTAssertTrue(budgets.contains(where: { b in
+            b.amount == 3.6 && b.date == budgetDate && b.items.count == 2 }))
+        
+        let undoOp = persister.undo()
+        XCTAssert(undoOp != nil)
+        if let op = undoOp {
+            XCTAssertEqual(op.opType, .update)
+        }
+        budgets = try persister.retrieve(type: Budget.self)
+        
+        XCTAssertEqual(budgets.count, 1)
+        XCTAssertTrue(budgets.contains(where: { b in
+            b.amount == 3.6 && b.date == budgetDate && b.items.count == 0 }))
+        
+        let redoOp = persister.redo()
+        XCTAssert(redoOp != nil)
+        if let op = redoOp {
+            XCTAssertEqual(op.opType, .update)
+        }
+        budgets = try persister.retrieve(type: Budget.self)
         
         XCTAssertEqual(budgets.count, 1)
         XCTAssertTrue(budgets.contains(where: { b in
