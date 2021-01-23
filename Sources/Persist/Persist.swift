@@ -446,7 +446,7 @@ public struct SQLitePersister : Persister {
         return operation
     }
     
-    func createTables() throws {
+    public func createTables() throws {
         try db.run(byType.create(ifNotExists: true) { t in
             t.column(id, primaryKey: true)
             t.column(typeName)
