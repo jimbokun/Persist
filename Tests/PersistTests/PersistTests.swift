@@ -233,6 +233,16 @@ final class PersistTests: XCTestCase {
         XCTAssertTrue(retrievedItems.contains(where: { item in
             item.label == "budget item test" && item.budgeted == 1.6}))
 
+        while (persister.undo() != nil) {}
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        XCTAssert(retrievedItems.isEmpty)
+        
+        persister.redo()
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        XCTAssertEqual(retrievedItems.count, 1)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.5}))
+
     }
 
     static var allTests = [

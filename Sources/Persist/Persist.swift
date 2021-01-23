@@ -307,14 +307,14 @@ public struct SQLitePersister : Persister {
         }
         object.saveState = self
     }
-
+    
     fileprivate func save<T>(object: inout T, recurse: Bool) throws where T: Saveable {
         try saveProperties(object: &object)
         try insertRelationsHistory(object, relationsHistoryBefore)
         try object.saveRelated(recurse: recurse)
         try insertRelationsHistory(object, relationsHistoryAfter)
     }
-
+    
     public func save<T>(object: inout T) throws where T: Saveable {
         try save(object: &object, recurse: false)
     }
@@ -331,7 +331,7 @@ public struct SQLitePersister : Persister {
             }
         }
     }
-
+    
     public func saveRelations<From, To>(object: From, items: inout [To], property: String, toType: To.Type, recurse: Bool) throws where From: Saveable, To: Saveable {
         if let identifier = object.identifier {
             try db.run(relations
@@ -400,7 +400,6 @@ public struct SQLitePersister : Persister {
         try db.run(operations
                     .filter(isCurrentFilter)
                     .update(isCurrent <- true))
-
     }
     
     public func undo() -> Operation? {
@@ -431,19 +430,15 @@ public struct SQLitePersister : Persister {
     
     public func redo() -> Operation? {
         var operation: Operation?
-        let nextOpQuery = operations
-            .select(nextOperation)
-            .filter(isCurrent)
         do {
-            for nextOpRow in try db.prepare(nextOpQuery) {
-                let byTypeQuery = byTypeHistory
-                    .select(operationId, operationType, byTypeId, typeName, beforeJson, afterJson)
-                    .filter(operationId == nextOpRow[nextOperation])
-                    .join(operations, on: operations[id] == byTypeHistory[operationId])
-                for row in try db.prepare(byTypeQuery) {
-                    operation = try performOperation(row[operationType], row, row[afterJson], relationsHistoryAfter)
-                    try toggleIsCurrent(isCurrentFilter: id == row[operationId])
-                }
+            let opId = (try db.scalar(operations.filter(isCurrent).count) > 0) ? try db.scalar(operations.select(nextOperation).filter(isCurrent)) : try db.scalar(operations.select(id).order(id).limit(1))
+            let byTypeQuery = byTypeHistory
+                .select(operationId, operationType, byTypeId, typeName, beforeJson, afterJson)
+                .filter(operationId == opId)
+                .join(operations, on: operations[id] == byTypeHistory[operationId])
+            for row in try db.prepare(byTypeQuery) {
+                operation = try performOperation(row[operationType], row, row[afterJson], relationsHistoryAfter)
+                try toggleIsCurrent(isCurrentFilter: id == row[operationId])
             }
         } catch {
             return nil
