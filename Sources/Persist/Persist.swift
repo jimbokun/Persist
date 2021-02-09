@@ -272,7 +272,12 @@ public struct SQLitePersister : Persister {
     func insertUndoOperation(opType: OperationType, buildOp: (Int) throws -> ()) throws {
         let opId = try db.run(operations.insert(operationType <- opType, isCurrent <- false, nextOperation <- -1))
         let newOpId: Int = Int(truncatingIfNeeded: opId)
-        try db.run(operations.filter(isCurrent).update(isCurrent <- false, nextOperation <- newOpId))
+        if (try db.scalar(operations.filter(isCurrent).count) > 0) {
+            try db.run(operations.filter(isCurrent).update(isCurrent <- false, nextOperation <- newOpId))
+        } else {
+            let firstId = try! db.scalar(operations.select(id).order(id).limit(1))
+            try db.run(operations.filter(id == firstId).update(isCurrent <- false, nextOperation <- newOpId))
+        }
         try db.run(operations.filter(id == newOpId).update(isCurrent <- true))
         try buildOp(newOpId)
     }
