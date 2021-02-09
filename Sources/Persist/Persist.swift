@@ -319,15 +319,56 @@ public struct SQLitePersister : Persister {
         try object.saveRelated(recurse: recurse)
         try insertRelationsHistory(object, relationsHistoryAfter)
     }
-    
+
     public func save<T>(object: inout T) throws where T: Saveable {
-        try save(object: &object, recurse: false)
+        do {
+            try db.transaction {
+                try save(object: &object, recurse: false)
+                try isIdempotentOperation()
+            }
+        } catch {
+            
+        }
     }
     
     public func saveAll<T>(object: inout T) throws where T: Saveable {
         try save(object: &object, recurse: true)
     }
     
+    fileprivate struct IdempotentUpdateError : Error {}
+
+    fileprivate func isIdempotentOperation() throws {
+        let byTypeQuery = operations
+            .select(operationType, beforeJson, afterJson)
+            .filter(isCurrent)
+            .join(byTypeHistory, on: operations[id] == byTypeHistory[operationId])
+
+        for row in try db.prepare(byTypeQuery) {
+            if (row[operationType] == .update && row[beforeJson] == row[afterJson]) {
+                let beforeRelations = try currentRelations(relationsTable: relationsHistoryBefore)
+                let afterRelations = try currentRelations(relationsTable: relationsHistoryAfter)
+                if (beforeRelations == afterRelations) {
+                    throw IdempotentUpdateError()
+                }
+            }
+        }
+    }
+    
+    fileprivate struct Relation: Hashable {
+        let relation: String
+        let from: Int
+        let to: Int
+    }
+
+    fileprivate func currentRelations(relationsTable: Table) throws -> Set<Relation> {
+        let relationsQuery = operations
+            .select(relation, from, to)
+            .filter(isCurrent)
+            .join(relationsTable, on: operations[id] == relationsTable[operationId])
+        return Set(try db.prepare(relationsQuery)
+                    .map({ row in Relation(relation: row[relation], from: row[from], to: row[to]) }))
+    }
+
     fileprivate func insertRelationsHistory<T>(_ object: T, _ relationsHistory: Table) throws where T: Saveable {
         let opId = try db.scalar(operations.select(id).filter(isCurrent))
         if let identifier = object.identifier {

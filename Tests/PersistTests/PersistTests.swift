@@ -207,6 +207,7 @@ final class PersistTests: XCTestCase {
         item1 = retrievedItems[0]
         item1.budgeted = 1.6
         try persister.save(object: &item1)
+        try persister.save(object: &item1)
         retrievedItems = try persister.retrieve(type: BudgetItem.self)
         
         XCTAssertEqual(retrievedItems.count, 1)
