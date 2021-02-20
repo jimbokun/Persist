@@ -149,7 +149,7 @@ public struct ActualItem : Saveable, Hashable {
     }
 }
 
-public struct Transaction : Saveable, Equatable {
+public struct Transaction : Saveable, Hashable {
     public var id: Int {
         get { identifier ?? -1 }
     }
