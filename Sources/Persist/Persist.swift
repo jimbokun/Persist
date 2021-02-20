@@ -6,13 +6,13 @@ import Foundation
  All "scalar" (non-Saveable) values will be automatically encoded and decoded through the Codable protocol.
  Other related objects must implement Saveable.
  */
-public protocol Saveable : Codable {
+public protocol Saveable : Codable, Identifiable {
     var saveState: Persister? { get set }
     /**
      Uniquely identifies this object.
-     */
+    */
     var identifier: Int? { get set }
-    
+
     /**
      Retrieve and set related Saveable objects.
      */
