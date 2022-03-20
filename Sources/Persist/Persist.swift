@@ -6,6 +6,7 @@ import Foundation
  All "scalar" (non-Saveable) values will be automatically encoded and decoded through the Codable protocol.
  Other related objects must implement Saveable.
  */
+@available(macOS 10.15, *)
 public protocol Saveable : Codable, Identifiable {
     var saveState: Persister? { get set }
     /**
@@ -24,6 +25,7 @@ public protocol Saveable : Codable, Identifiable {
     mutating func saveRelated(recurse: Bool) throws
 }
 
+@available(macOS 10.15, *)
 extension Saveable {
     func related<To>(property: String, toType: To.Type) -> [To] where To: Saveable {
         (try? saveState?.related(object: self, property: property, toType: toType)) ?? []
@@ -93,6 +95,7 @@ public struct Operation {
 /**
  Defines methods for persisting and retrieving objects.
  */
+@available(macOS 10.15, *)
 public protocol Persister {
     /**
      Retrieve all objects of type T.
@@ -148,6 +151,7 @@ public protocol Persister {
 /**
  Implementation of Persister backed by a SQLite database.
  */
+@available(macOS 10.15, *)
 public struct SQLitePersister : Persister {
     let db: Connection
     

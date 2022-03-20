@@ -8,6 +8,7 @@
 
 import Foundation
 
+@available(macOS 10.15, *)
 public struct Budget: Saveable, Hashable {
     public var id: Int {
         get { identifier ?? -1 }
@@ -54,6 +55,7 @@ public struct Budget: Saveable, Hashable {
 }
 
 
+@available(macOS 10.15, *)
 public struct BudgetItem : Saveable, Hashable {
     public var id: Int {
         get { identifier ?? -1 }
@@ -99,6 +101,7 @@ public struct BudgetItem : Saveable, Hashable {
     }
 }
 
+@available(macOS 10.15, *)
 public struct ActualItem : Saveable, Hashable {
     public var id: Int {
         get { identifier ?? -1 }
@@ -149,6 +152,7 @@ public struct ActualItem : Saveable, Hashable {
     }
 }
 
+@available(macOS 10.15, *)
 public struct Transaction : Saveable, Hashable {
     public var id: Int {
         get { identifier ?? -1 }
@@ -188,8 +192,8 @@ public struct Transaction : Saveable, Hashable {
         hasher.combine(Money(amount: amount))
         hasher.combine(memo)
         hasher.combine(name)
-        hasher.combine(checkno)
         hasher.combine(timestamp)
+        hasher.combine(checkno)
     }
 
     mutating public func initialize() {
