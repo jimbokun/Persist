@@ -23,6 +23,11 @@ public protocol Saveable : Codable, Identifiable {
      Save related Saveable objects.
      */
     mutating func saveRelated(recurse: Bool) throws
+    
+    /**
+     Cascading delete of related objects.
+     */
+    func deleteRelated() throws
 }
 
 @available(macOS 10.15, *)
@@ -57,6 +62,21 @@ extension Saveable {
             }
         }
     }
+
+    public func saveRelated(recurse: Bool) {
+    }
+
+    public func deleteRelated() throws {
+    }
+
+    func deleteRelated<To>(related: To) throws where To: Saveable {
+        try saveState?.delete(object: related, recurse: true)
+    }
+
+    func deleteRelated<To>(related: [To]) throws where To: Saveable {
+        try related.forEach({ item in try deleteRelated(related: item) })
+    }
+
 }
 
 public enum OperationType: Value {
@@ -144,7 +164,29 @@ public protocol Persister {
      */
     func delete<T>(object: T) throws where T: Saveable
     
+    /**
+     Delete object and its relationships, and recursively delete all related Saveable objects.
+     */
+    func deleteAll<T>(object: T) throws where T: Saveable
+
+    /**
+     Delete object and its relationships to other objects, and recursively delete all related Saveable objects if recurse is true.
+     */
+    func delete<T>(object: T, recurse: Bool) throws where T: Saveable
+
+    /**
+     All  actions in perform will occur in the same undo transaction, meaning all of them will be undone on the next call to undo(), back to the state before this call to withUndoTransaction.
+     */
+    func withUndoTransaction(perform: () throws -> ())
+
+    /**
+     Undo the last transaction.  Returns the last operation from the transaction.
+     */
     func undo() -> Operation?
+    
+    /**
+     Redo the last transaction undone by calling undo().  Returns the last operation from the transaction.
+     */
     func redo() -> Operation?
 }
 
@@ -178,6 +220,11 @@ public struct SQLitePersister : Persister {
     let relationsHistoryBefore: Table
     let relationsHistoryAfter: Table
     
+    let undoTransactions: Table
+    let undoOperationStart: Expression<Int>
+    let undoOperationEnd: Expression<Int>
+    let nextUndoTransaction: Expression<Int>
+
     let decoder: JSONDecoder
     let encoder: JSONEncoder
     
@@ -206,6 +253,11 @@ public struct SQLitePersister : Persister {
         self.relationsHistoryBefore = Table("relations_history_before")
         self.relationsHistoryAfter = Table("relations_history_after")
         
+        self.undoTransactions = Table("undo_transactions")
+        self.undoOperationStart = Expression<Int>("undo_operation_start")
+        self.undoOperationEnd = Expression<Int>("undo_operation_end")
+        self.nextUndoTransaction = Expression<Int>("next_undo_transaction")
+
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZZ"
         
@@ -272,20 +324,7 @@ public struct SQLitePersister : Persister {
             items.append(contentsOf: relatedItems)
         }
     }
-    
-    func insertUndoOperation(opType: OperationType, buildOp: (Int) throws -> ()) throws {
-        let opId = try db.run(operations.insert(operationType <- opType, isCurrent <- false, nextOperation <- -1))
-        let newOpId: Int = Int(truncatingIfNeeded: opId)
-        if (try db.scalar(operations.filter(isCurrent).count) > 0) {
-            try db.run(operations.filter(isCurrent).update(isCurrent <- false, nextOperation <- newOpId))
-        } else {
-            let firstId = try! db.scalar(operations.select(id).order(id).limit(1))
-            try db.run(operations.filter(id == firstId).update(isCurrent <- false, nextOperation <- newOpId))
-        }
-        try db.run(operations.filter(id == newOpId).update(isCurrent <- true))
-        try buildOp(newOpId)
-    }
-    
+
     func saveProperties<T>(object: inout T) throws where T: Saveable {
         let encodedJson = try String(data: encoder.encode(object), encoding: .utf8)
         let objectType = String(describing: type(of: object))
@@ -303,15 +342,15 @@ public struct SQLitePersister : Persister {
             try db.run(byType
                         .filter(id == identifier)
                         .update(json <- encodedJson!, typeName <- objectType))
-        } else {
-            let lastId = try db.run(byType.insert(json <- encodedJson!, typeName <- objectType))
+        } else if let encodedJson = encodedJson {
+            let lastId = try db.run(byType.insert(json <- encodedJson, typeName <- objectType))
             object.identifier = Int(lastId)
             try insertUndoOperation(opType: .create, buildOp: { opId in
                 try db.run(byTypeHistory.insert(operationId <- opId,
                                                 byTypeId <- Int(lastId),
                                                 typeName <- objectType,
                                                 beforeJson <- "",
-                                                afterJson <- encodedJson!))
+                                                afterJson <- encodedJson))
             })
         }
         object.saveState = self
@@ -325,18 +364,20 @@ public struct SQLitePersister : Persister {
     }
 
     public func save<T>(object: inout T) throws where T: Saveable {
-        do {
-            try db.transaction {
-                try save(object: &object, recurse: false)
-                try isIdempotentOperation()
-            }
-        } catch {
-            
+        withUndoTransaction {
+            try save(object: &object, recurse: false)
+            try isIdempotentOperation()
         }
     }
     
-    public func saveAll<T>(object: inout T) throws where T: Saveable {
+    fileprivate func _saveAll<T>(object: inout T) throws where T: Saveable {
         try save(object: &object, recurse: true)
+    }
+    
+    public func saveAll<T>(object: inout T) throws where T: Saveable {
+        withUndoTransaction {
+            try _saveAll(object: &object)
+        }
     }
     
     fileprivate struct IdempotentUpdateError : Error {}
@@ -389,7 +430,7 @@ public struct SQLitePersister : Persister {
                         .delete())
             for var item in items {
                 if recurse {
-                    try saveAll(object: &item)
+                    try _saveAll(object: &item)
                 }
                 if let toIdentifier = item.identifier {
                     try db.run(relations.insert(from <- identifier,
@@ -401,6 +442,12 @@ public struct SQLitePersister : Persister {
     }
     
     public func delete<T>(object: T) throws where T: Saveable {
+        withUndoTransaction {
+            try delete(object: object, recurse: false)
+        }
+    }
+
+    public func delete<T>(object: T, recurse: Bool) throws where T: Saveable {
         if let identifier = object.identifier {
             try insertUndoOperation(opType: .delete, buildOp: { opId in
                 for old in try db.prepare(byType.select(json, typeName).filter(id == identifier)) {
@@ -411,12 +458,73 @@ public struct SQLitePersister : Persister {
                                                     beforeJson <- old[json]))
                 }
             })
+            try insertRelationsHistory(object, relationsHistoryBefore)
+
             try db.run(byType.filter(id == identifier).delete())
             try db.run(relations.filter(from == identifier).delete())
             try db.run(relations.filter(to == identifier).delete())
+            if (recurse) {
+                try object.deleteRelated()
+            }
+
+            try insertRelationsHistory(object, relationsHistoryAfter)
         }
     }
+
+    public func deleteAll<T>(object: T) throws where T : Saveable {
+        withUndoTransaction {
+            try delete(object: object, recurse: true)
+        }
+    }
+
+    // MARK: - Undo/Redo -
     
+    fileprivate func selectFirstId(table: Table) -> ScalarQuery<Int> {
+        table.select(id).order(id).limit(1)
+    }
+
+    func insertUndoOperation(opType: OperationType, buildOp: (Int) throws -> ()) throws {
+        let opId = try db.run(operations.insert(operationType <- opType, isCurrent <- false, nextOperation <- -1))
+        let newOpId: Int = Int(truncatingIfNeeded: opId)
+        let currentOpQuery = operations.filter(isCurrent)
+        if let _ = try db.pluck(currentOpQuery) {
+            try db.run(currentOpQuery.update(isCurrent <- false, nextOperation <- newOpId))
+        } else {
+            let firstId = try! db.scalar(selectFirstId(table: operations))
+            try db.run(operations.filter(id == firstId).update(isCurrent <- false, nextOperation <- newOpId))
+        }
+        try db.run(operations.filter(id == newOpId).update(isCurrent <- true))
+        try buildOp(newOpId)
+    }
+
+    fileprivate func currentOperationId() throws -> Int {
+        if let row = try db.pluck(operations.select(id).filter(isCurrent)) {
+            return row[id]
+        }
+        return 0
+    }
+    
+    public func withUndoTransaction(perform: () throws -> ()) {
+        do {
+            try db.transaction {
+                let txStartOp = try currentOperationId()
+                
+                try perform()
+                
+                let txEndOp = try currentOperationId()
+                // insert undoTxId, txStartOp, txEndOp into undoTransactions table
+                let txId = try db.run(undoTransactions.insert(undoOperationStart <- txStartOp, undoOperationEnd <- txEndOp, nextUndoTransaction <- -1, isCurrent <- false))
+                let newTxId: Int = Int(truncatingIfNeeded: txId)
+                // update current transaction pointer
+                try db.run(undoTransactions.filter(isCurrent).update(isCurrent <- false,
+                                                                     nextUndoTransaction <- newTxId))
+                try db.run(undoTransactions.filter(id == newTxId).update(isCurrent <- true))
+            }
+        } catch {
+            print("Rolling back undo transaction.")
+        }
+    }
+
     fileprivate func performOperation(_ opType: OperationType, _ row: Row, _ updateJson: String, _ relationsHistory: Table) throws -> Operation {
         let relationsQuery = relationsHistory
             .select(from, to, relation)
@@ -443,58 +551,117 @@ public struct SQLitePersister : Persister {
         return Operation(opType: opType, id: row[operationId], typeName: row[typeName])
     }
     
-    fileprivate func toggleIsCurrent(isCurrentFilter: Expression<Bool>) throws {
-        try db.run(operations
-                    .filter(isCurrent)
-                    .update(isCurrent <- false))
-        try db.run(operations
-                    .filter(isCurrentFilter)
-                    .update(isCurrent <- true))
+    fileprivate func toggleIsCurrentOperation(isCurrentFilter: Expression<Bool>) throws {
+        try db.run(operations.filter(isCurrent).update(isCurrent <- false))
+        try db.run(operations.filter(isCurrentFilter).update(isCurrent <- true))
+    }
+
+    fileprivate func performUndoOperationWithRow(_ row: Row) throws -> Operation? {
+        let opType: OperationType
+        switch row[operationType] {
+        case .create:
+            opType = .delete
+        case .delete:
+            opType = .create
+        default:
+            opType = .update
+        }
+        let operation = try performOperation(opType, row, row[beforeJson], relationsHistoryBefore)
+        try toggleIsCurrentOperation(isCurrentFilter: nextOperation == row[operationId])
+        return operation
     }
     
-    public func undo() -> Operation? {
+    fileprivate func performRedoOperationWithId(_ opId: Int) throws -> Operation? {
         var operation: Operation?
-        let byTypeQuery = operations
-            .select(operationId, operationType, byTypeId, typeName, beforeJson, afterJson)
-            .filter(isCurrent)
-            .join(byTypeHistory, on: operations[id] == byTypeHistory[operationId])
         do {
-            for row in try db.prepare(byTypeQuery) {
-                let opType: OperationType
-                switch row[operationType] {
-                case .create:
-                    opType = .delete
-                case .delete:
-                    opType = .create
-                default:
-                    opType = .update
-                }
-                operation = try performOperation(opType, row, row[beforeJson], relationsHistoryBefore)
-                try toggleIsCurrent(isCurrentFilter: nextOperation == row[operationId])
+            if let row = try db.pluck(operationQuery(operations[id] == opId)) {
+                operation = try performOperation(row[operationType], row, row[afterJson], relationsHistoryAfter)
+                try toggleIsCurrentOperation(isCurrentFilter: operations[id] == opId)
             }
         } catch {
-            return nil
+            print("Failed to execute redo operation")
         }
         return operation
+    }
+    
+    fileprivate func operationQuery(_ opFilter: Expression<Bool>) -> Table {
+        return operations
+            .select(operationId, operationType, byTypeId, typeName, beforeJson, afterJson)
+            .filter(opFilter)
+            .join(byTypeHistory, on: operations[id] == byTypeHistory[operationId])
+    }
+    
+    fileprivate func toggleCurrentTransaction(_ isCurrentFilter: Expression<Bool>) throws {
+        try db.run(undoTransactions.filter(isCurrent).update(isCurrent <- false))
+        try db.run(undoTransactions.filter(isCurrentFilter).update(isCurrent <- true))
+    }
+    
+
+    public func undo() -> Operation? {
+        var operation: Operation?
+        do {
+            if let txRow = try db.pluck(selectUndoTransaction().filter(isCurrent)) {
+                var undoOpId = txRow[undoOperationEnd]
+                repeat {
+                    if let row = try db.pluck(operationQuery(operations[id] == undoOpId)) {
+                        operation = try performUndoOperationWithRow(row)
+                    }
+                    let undoOpIdRow = try db.pluck(operations.select(id).filter(nextOperation == undoOpId))
+                    undoOpId = undoOpIdRow?[id] ?? -1
+                } while (undoOpId != -1 && undoOpId != txRow[undoOperationStart])
+                try toggleCurrentTransaction(undoTransactions[nextUndoTransaction] == txRow[id])
+            }
+        } catch {
+            print("Error executing undo")
+        }
+        return operation
+    }
+
+    func currentRedoTransactionId() -> Int? {
+        do {
+            if let nextOp = try db.pluck(undoTransactions.select(nextUndoTransaction).filter(isCurrent)) {
+                return nextOp[nextUndoTransaction]
+            } else if let nextOp = try db.pluck(selectFirstId(table: undoTransactions)) {
+                return nextOp[id]
+            }
+        } catch {
+        }
+        return nil
+    }
+    
+    fileprivate func nextRedoOpId(_ undoOpId: Int) throws -> Int {
+        if let undoOpIdRow = try db.pluck(operations.select(nextOperation).filter(id == undoOpId)) {
+            return undoOpIdRow[nextOperation]
+        } else if let undoOpIdRow = try db.pluck(selectFirstId(table: undoTransactions)) {
+            return undoOpIdRow[id]
+        }
+        return -1
+    }
+    
+    fileprivate func selectUndoTransaction() -> Table {
+        return undoTransactions.select(id, undoOperationStart, undoOperationEnd)
     }
     
     public func redo() -> Operation? {
         var operation: Operation?
         do {
-            let opId = (try db.scalar(operations.filter(isCurrent).count) > 0) ? try db.scalar(operations.select(nextOperation).filter(isCurrent)) : try db.scalar(operations.select(id).order(id).limit(1))
-            let byTypeQuery = byTypeHistory
-                .select(operationId, operationType, byTypeId, typeName, beforeJson, afterJson)
-                .filter(operationId == opId)
-                .join(operations, on: operations[id] == byTypeHistory[operationId])
-            for row in try db.prepare(byTypeQuery) {
-                operation = try performOperation(row[operationType], row, row[afterJson], relationsHistoryAfter)
-                try toggleIsCurrent(isCurrentFilter: id == row[operationId])
+            if let redoTxId = currentRedoTransactionId() {
+                if let row = try db.pluck(selectUndoTransaction().filter(undoTransactions[id] == redoTxId)) {
+                    var undoOpId = row[undoOperationStart]
+                    while (undoOpId != -1 && undoOpId != row[undoOperationEnd]) {
+                        undoOpId = try nextRedoOpId(undoOpId)
+                        operation = try performRedoOperationWithId(undoOpId)
+                    }
+                    try toggleCurrentTransaction(undoTransactions[id] == row[id])
+                }
             }
         } catch {
-            return nil
+            
         }
         return operation
     }
+
+    // MARK: - Create Tables -
     
     public func createTables() throws {
         try db.run(byType.create(ifNotExists: true) { t in
@@ -534,6 +701,13 @@ public struct SQLitePersister : Persister {
             t.column(from)
             t.column(to)
             t.column(relation)
+        })
+        try db.run(undoTransactions.create(ifNotExists: true) { t in
+            t.column(id, primaryKey: true)
+            t.column(undoOperationStart)
+            t.column(undoOperationEnd)
+            t.column(isCurrent)
+            t.column(nextUndoTransaction)
         })
     }
 }

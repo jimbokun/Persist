@@ -119,7 +119,7 @@ final class PersistTests: XCTestCase {
         budget.items = [item1, item2]
         try persister.saveAll(object: &budget)
         
-        let retrievedItems = try persister.retrieve(type: BudgetItem.self)
+        var retrievedItems = try persister.retrieve(type: BudgetItem.self)
 
         XCTAssertEqual(retrievedItems.count, 2)
         XCTAssertTrue(retrievedItems.contains(where: { item in
@@ -127,11 +127,62 @@ final class PersistTests: XCTestCase {
         XCTAssertTrue(retrievedItems.contains(where: { item in
             item.label == "budget item test2" && item.budgeted == 2.1}))
 
-        let budgets: [Budget] = try persister.retrieve(type: Budget.self)
+        var budgets: [Budget] = try persister.retrieve(type: Budget.self)
         
         XCTAssertEqual(budgets.count, 1)
         XCTAssertTrue(budgets.contains(where: { b in
             b.amount == 3.6 && b.date == budgetDate && b.items.count == 2 }))
+        
+        _ = persister.undo()
+        
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+
+        XCTAssertEqual(retrievedItems.count, 0)
+        budgets = try persister.retrieve(type: Budget.self)
+        
+        XCTAssertEqual(budgets.count, 0)
+        
+        _ = persister.redo()
+        
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+
+        XCTAssertEqual(retrievedItems.count, 2)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.5}))
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test2" && item.budgeted == 2.1}))
+
+        budgets = try persister.retrieve(type: Budget.self)
+        
+        XCTAssertEqual(budgets.count, 1)
+        XCTAssertTrue(budgets.contains(where: { b in
+            b.amount == 3.6 && b.date == budgetDate && b.items.count == 2 }))
+        
+        try persister.deleteAll(object: budgets[0])
+
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+
+        XCTAssertEqual(retrievedItems.count, 0)
+        budgets = try persister.retrieve(type: Budget.self)
+        
+        XCTAssertEqual(budgets.count, 0)
+        
+        _ = persister.undo()
+        
+        retrievedItems = try persister.retrieve(type: BudgetItem.self)
+
+        XCTAssertEqual(retrievedItems.count, 2)
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test" && item.budgeted == 1.5}))
+        XCTAssertTrue(retrievedItems.contains(where: { item in
+            item.label == "budget item test2" && item.budgeted == 2.1}))
+
+        budgets = try persister.retrieve(type: Budget.self)
+        
+        XCTAssertEqual(budgets.count, 1)
+        XCTAssertTrue(budgets.contains(where: { b in
+            b.amount == 3.6 && b.date == budgetDate && b.items.count == 2 }))
+
     }
 
     func testDeleteItem() throws {
@@ -238,7 +289,7 @@ final class PersistTests: XCTestCase {
         retrievedItems = try persister.retrieve(type: BudgetItem.self)
         XCTAssert(retrievedItems.isEmpty)
         
-        persister.redo()
+        _ = persister.redo()
         retrievedItems = try persister.retrieve(type: BudgetItem.self)
         XCTAssertEqual(retrievedItems.count, 1)
         XCTAssertTrue(retrievedItems.contains(where: { item in

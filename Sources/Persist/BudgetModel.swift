@@ -10,6 +10,7 @@ import Foundation
 
 @available(macOS 10.15, *)
 public struct Budget: Saveable, Hashable {
+    
     public var id: Int {
         get { identifier ?? -1 }
     }
@@ -47,6 +48,10 @@ public struct Budget: Saveable, Hashable {
     mutating public func saveRelated(recurse: Bool) throws {
         try saveRelations(property: "items", toType: BudgetItem.self, recurse: recurse)
     }
+    
+    public func deleteRelated() throws {
+        try deleteRelated(related: items)
+    }
 
     enum CodingKeys: CodingKey {
         case date
@@ -57,6 +62,7 @@ public struct Budget: Saveable, Hashable {
 
 @available(macOS 10.15, *)
 public struct BudgetItem : Saveable, Hashable {
+    
     public var id: Int {
         get { identifier ?? -1 }
     }
@@ -95,6 +101,10 @@ public struct BudgetItem : Saveable, Hashable {
         try saveRelations(property: "actual_items", toType: ActualItem.self, recurse: recurse)
     }
 
+    public func deleteRelated() throws {
+        try deleteRelated(related: actual_items)
+    }
+
     enum CodingKeys: CodingKey {
         case label
         case budgeted
@@ -103,6 +113,7 @@ public struct BudgetItem : Saveable, Hashable {
 
 @available(macOS 10.15, *)
 public struct ActualItem : Saveable, Hashable {
+    
     public var id: Int {
         get { identifier ?? -1 }
     }
@@ -140,9 +151,6 @@ public struct ActualItem : Saveable, Hashable {
     
     public func initialize() {
     }
-    
-    public func saveRelated(recurse: Bool) {
-    }
 
     enum CodingKeys: CodingKey {
         case amount
@@ -154,6 +162,7 @@ public struct ActualItem : Saveable, Hashable {
 
 @available(macOS 10.15, *)
 public struct Transaction : Saveable, Hashable {
+    
     public var id: Int {
         get { identifier ?? -1 }
     }
@@ -204,6 +213,13 @@ public struct Transaction : Saveable, Hashable {
     mutating public func saveRelated(recurse: Bool) throws {
         try saveRelation(property: "actual_item", toType: ActualItem.self, recurse: recurse)
         try saveRelations(property: "splits", toType: Transaction.self, recurse: recurse)
+    }
+
+    public func deleteRelated() throws {
+        if let actual_item = actual_item {
+            try deleteRelated(related: actual_item)
+        }
+        try deleteRelated(related: splits)
     }
 
     enum CodingKeys: CodingKey {
