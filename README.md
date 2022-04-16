@@ -1,4 +1,4 @@
-# Persist
+# Persist - Now with Infinite Undo!
 
 A thin wrapper on top of the excellent SQLite.swift library for persisting Swift structs to SQLite.
 
@@ -36,8 +36,30 @@ To save and retrieve structs using Persist, each struct must
 * include CodingKey enum defining all of its Codable properties,
 * implement initialize to retrieve all related Saveable objects,
 * implement saveRelated to save all related Saveable objects.
+* implement deleteRelated to recursively delete all related Saveable objects when calling deleteAll (this method is optional if you don't need cascading delete).
 
 See BudgetModel.swift for examples.
+
+Persist now also supports unlimited undo.  After saving or deleting a struct, you can undo that action by calling undo on the
+persister.
+        
+```
+_ = persister.undo()
+        
+retrievedItems = try persister.retrieve(type: BudgetItem.self)
+// retrieves 0 items
+budgets = try persister.retrieve(type: Budget.self)
+// retrieves 0 items
+
+_ = persister.redo()
+        
+retrievedItems = try persister.retrieve(type: BudgetItem.self)
+// contains 2 items
+budgets = try persister.retrieve(type: Budget.self)
+// contains 1 item
+```
+
+Persist saves the undo history in SQLite tables.  So you can run your application, quit it, and then after restarting it undo operations performed the last time the application was open.
 
 ## History
 
@@ -70,6 +92,67 @@ The directed edges of the graph.  Models references from one object to another.
 |from_id|identifies the referencing object|
 |to_id|identifies the referenced object|
 |relation|name of the property|
+
+The following tables all relate to undo/redo functionality.
+
+### operations
+
+The history of operations performed.
+ 
+|Column|Description|
+|---------|-------------|
+|id|uniquely identifies the operation|
+|operationType|create, update or delete|
+|isCurrent|true only for operation that will be undone if undo() is called|
+|nextOperation|id of next operation to perform|
+
+### by_type_history
+
+History of changes to by_type.
+
+|Column|Description|
+|---------|-------------|
+|operationId|foreign key to operations|
+|byTypeId|foreign key to by_type|
+|typeName|the struct type|
+|beforeJson|codable properties coded as JSON before the operation|
+|afterJson|codable properties coded as JSON after the operation|
+
+### relations_history_before
+
+State of relations before the operation.
+
+|Column|Description|
+|---------|-------------|
+|id|unique identifier|
+|operationId|foreign key to operations|
+|from|identifies the referencing object|
+|to|identifies the referenced object|
+|relation|name of the property|
+
+### relations_history_after
+
+State of relations after the operation.
+
+|Column|Description|
+|---------|-------------|
+|id|unique identifier|
+|operationId|foreign key to operations|
+|from|identifies the referencing object|
+|to|identifies the referenced object|
+|relation|name of the property|
+
+### undo_transactions
+
+Groups operations into transactions for undo operations.
+
+|Column|Description|
+|---------|-------------|
+|id|unique identifier|
+|undoOperationStart|points to first operation in the transaction|
+|undoOperationEnd|points to last operation in the transaction|
+|isCurrent|true only for operation that will be undone if undo() is called|
+|nextUndoTransaction|points to next transaction|
 
 ## Limitations
 
