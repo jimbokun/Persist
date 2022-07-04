@@ -128,6 +128,11 @@ public protocol Persister {
     func retrieve<T>(type: T.Type, start: Int, limit: Int) throws -> [T] where T: Saveable
     
     /**
+     Retrieve the object identified by itemId if it exists, nil otherwise.
+     */
+    func retrieveById<T>(type: T.Type, itemId: Int) throws -> T? where T: Saveable
+
+    /**
      Retrieve objects related to object of type To, via property.
      */
     func related<From, To>(object: From, property: String, toType: To.Type) throws -> [To] where From: Saveable, To: Saveable
@@ -297,6 +302,14 @@ public struct SQLitePersister : Persister {
         return try retrieve(query: query, type: type)
     }
     
+    public func retrieveById<T>(type: T.Type, itemId: Int) throws -> T? where T: Saveable {
+        let query = byType.select(id, json)
+            .filter(typeName == String(describing: type))
+            .where(id == itemId)
+        let retrieved = try retrieve(query: query, type: type)
+        return retrieved.isEmpty ? nil : retrieved[0]
+    }
+
     public func retrieve<T>(type: T.Type) throws -> [T] where T: Saveable {
         let query = byType.select(id, json).filter(typeName == String(describing: type))
         return try retrieve(query: query, type: type)

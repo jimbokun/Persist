@@ -54,6 +54,11 @@ final class PersistTests: XCTestCase {
         XCTAssertEqual(retrievedItems.count, 1)
         XCTAssertTrue(retrievedItems.contains(where: { item in
             item.label == "budget item test" && item.budgeted == 1.6}))
+        
+        let retrievedItem = try persister.retrieveById(type: BudgetItem.self, itemId: item1.id)
+
+        XCTAssertNotNil(retrievedItem)
+        XCTAssertTrue(retrievedItem?.label == "budget item test" && retrievedItem?.budgeted == 1.6)
     }
     
     func testSaveRelatedItems() throws {
