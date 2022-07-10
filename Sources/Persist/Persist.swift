@@ -77,7 +77,7 @@ extension Saveable {
         try related.forEach({ item in try deleteRelated(related: item) })
     }
     
-    func indexCompletion(property: String) throws {
+    public func indexCompletion(property: String) throws {
         if let propertyValue = childWithLabel(property)?.value as? String {
             try saveState?.indexCompletion(object: self, property: property, propertyValue: propertyValue)
         }
