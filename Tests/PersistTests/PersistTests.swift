@@ -201,6 +201,14 @@ final class PersistTests: XCTestCase {
 
         XCTAssertEqual(retrievedItems.count, 2)
 
+        let labels = persister.completions(type: BudgetItem.self, property: "label", prefix: "budget i")
+        
+        XCTAssertEqual(labels.count, 2)
+
+        let emtpyLabels = persister.completions(type: BudgetItem.self, property: "label", prefix: "budget in")
+        
+        XCTAssertTrue(emtpyLabels.isEmpty)
+
         try persister.delete(object: item1)
         retrievedItems = try persister.retrieve(type: BudgetItem.self)
 

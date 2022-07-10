@@ -98,6 +98,7 @@ public struct BudgetItem : Saveable, Hashable {
     }
 
     mutating public func saveRelated(recurse: Bool) throws {
+        try indexCompletion(property: "label")
         try saveRelations(property: "actual_items", toType: ActualItem.self, recurse: recurse)
     }
 

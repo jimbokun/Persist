@@ -76,6 +76,12 @@ extension Saveable {
     func deleteRelated<To>(related: [To]) throws where To: Saveable {
         try related.forEach({ item in try deleteRelated(related: item) })
     }
+    
+    func indexCompletion(property: String) throws {
+        if let propertyValue = childWithLabel(property)?.value as? String {
+            try saveState?.indexCompletion(object: self, property: property, propertyValue: propertyValue)
+        }
+    }
 
 }
 
@@ -193,6 +199,10 @@ public protocol Persister {
      Redo the last transaction undone by calling undo().  Returns the last operation from the transaction.
      */
     func redo() -> Operation?
+
+    func indexCompletion<T>(object: T, property: String, propertyValue: String) throws where T: Saveable
+
+    func completions<T>(type: T.Type, property: String, prefix: String) -> [String]
 }
 
 /**
@@ -200,17 +210,21 @@ public protocol Persister {
  */
 @available(macOS 10.15, *)
 public struct SQLitePersister : Persister {
+    
     let db: Connection
     
     let byType: Table
     let relations: Table
+    let completions: Table
     let id: Expression<Int>
     let from: Expression<Int>
     let to: Expression<Int>
     let typeName: Expression<String>
     let json: Expression<String>
     let relation: Expression<String>
-    
+    let property: Expression<String>
+    let label: Expression<String>
+
     let operations: Table
     let operationId: Expression<Int>
     let operationType: Expression<OperationType>
@@ -262,6 +276,10 @@ public struct SQLitePersister : Persister {
         self.undoOperationStart = Expression<Int>("undo_operation_start")
         self.undoOperationEnd = Expression<Int>("undo_operation_end")
         self.nextUndoTransaction = Expression<Int>("next_undo_transaction")
+
+        self.completions = Table("completions")
+        self.property = Expression<String>("property")
+        self.label = Expression<String>("label")
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZZ"
@@ -673,6 +691,23 @@ public struct SQLitePersister : Persister {
         }
         return operation
     }
+    
+    // MARK: - Completions -
+    
+    public func indexCompletion<T>(object: T, property: String, propertyValue: String) throws where T: Saveable {
+        try db.run(completions.insert(typeName <- String(describing: type(of: object)),
+                                      self.property <- property,
+                                      label <- propertyValue))
+    }
+    
+    public func completions<T>(type: T.Type, property: String, prefix: String) -> [String] {
+        let query = completions
+            .select(label)
+            .filter(typeName == String(describing: type) &&
+                    self.property == property &&
+                    label.like("\(prefix)%"))
+        return (try? db.prepare(query).map { row in row[label] }) ?? []
+    }
 
     // MARK: - Create Tables -
     
@@ -721,6 +756,12 @@ public struct SQLitePersister : Persister {
             t.column(undoOperationEnd)
             t.column(isCurrent)
             t.column(nextUndoTransaction)
+        })
+        try db.run(completions.create(ifNotExists: true) { t in
+            t.column(id, primaryKey: true)
+            t.column(typeName)
+            t.column(property)
+            t.column(label)
         })
     }
 }
