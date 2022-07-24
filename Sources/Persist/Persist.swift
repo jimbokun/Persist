@@ -695,7 +695,8 @@ public struct SQLitePersister : Persister {
     // MARK: - Completions -
     
     public func indexCompletion<T>(object: T, property: String, propertyValue: String) throws where T: Saveable {
-        try db.run(completions.insert(typeName <- String(describing: type(of: object)),
+        try db.run(completions.insert(or: .replace,
+                                      typeName <- String(describing: type(of: object)),
                                       self.property <- property,
                                       label <- propertyValue))
     }
